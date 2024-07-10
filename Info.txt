@@ -1,0 +1,7 @@
+
+
+Global variables by default are editable within reshader
+.fx is just what files the reshader program looks for
+
+https://www.pcgamingwiki.com/wiki/Risk_of_Rain_2
+https://reshade.me/
