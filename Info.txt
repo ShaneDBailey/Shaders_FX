@@ -5,3 +5,6 @@ Global variables by default are editable within reshader
 
 https://www.pcgamingwiki.com/wiki/Risk_of_Rain_2
 https://reshade.me/
+
+
+each technique will pop up differntly
