@@ -45,29 +45,29 @@ technique MexicoTechnique
 
 //---------------------------------------Pixelated-----------------------------------------------//
 
-uniform int CHARACTER_SIZE = 8;
+uniform int PIXEL_GROUP_SIZE = 8;
 
 
 float4 AverageColor(float2 texture_cord, float2 texel_size)
 {
     float4 color_sum = float4(0, 0, 0, 0);
 
-    for (int y = 0; y < CHARACTER_SIZE; ++y)
+    for (int y = 0; y < PIXEL_GROUP_SIZE; ++y)
     {
-        for (int x = 0; x < CHARACTER_SIZE; ++x)
+        for (int x = 0; x < PIXEL_GROUP_SIZE; ++x)
         {
             float2 offset = float2(x, y) * texel_size;
             color_sum += tex2D(ReShade::BackBuffer, texture_cord + offset);
         }
     }
 
-    return color_sum / (CHARACTER_SIZE * CHARACTER_SIZE);
+    return color_sum / (PIXEL_GROUP_SIZE * PIXEL_GROUP_SIZE);
 }
 
 float4 PixelationFilter(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
 {
-    float2 texel_size = float2(CHARACTER_SIZE, CHARACTER_SIZE) / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
-    float2 block_texcoord = floor(texture_cord * float2(BUFFER_WIDTH, BUFFER_HEIGHT) / float2(CHARACTER_SIZE, CHARACTER_SIZE)) * texel_size;
+    float2 texel_size = float2(PIXEL_GROUP_SIZE, PIXEL_GROUP_SIZE) / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
+    float2 block_texcoord = floor(texture_cord * float2(BUFFER_WIDTH, BUFFER_HEIGHT) / float2(PIXEL_GROUP_SIZE, PIXEL_GROUP_SIZE)) * texel_size;
     float4 block_color = AverageColor(block_texcoord, texel_size);
 
     return block_color;
@@ -91,8 +91,8 @@ sampler2D ASCII_CHARACTERS{ Texture = ASCII_CHARACTERS_TEXTURE; AddressU = CLAMP
 float4 ASCII_Filter(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
 {
 
-    float2 texel_size = float2(CHARACTER_SIZE, CHARACTER_SIZE) / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
-    float2 block_texcoord = floor(texture_cord * float2(BUFFER_WIDTH, BUFFER_HEIGHT) / float2(CHARACTER_SIZE, CHARACTER_SIZE)) * texel_size;
+    float2 texel_size = float2(ASCII_CHARACTER_SIZE, ASCII_CHARACTER_SIZE) / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
+    float2 block_texcoord = floor(texture_cord * float2(BUFFER_WIDTH, BUFFER_HEIGHT) / float2(ASCII_CHARACTER_SIZE, ASCII_CHARACTER_SIZE)) * texel_size;
     float4 block_color = AverageColor(block_texcoord, texel_size);
     float brightness = (block_color.r + block_color.g + block_color.b) / 3 + 0.1;
 
@@ -121,8 +121,13 @@ technique ASCII_Technique
 //---------------------------------Guassion_Blur--------------------------------------------------//
 //https://www.rastergrid.com/blog/2010/09/efficient-gaussian-blur-with-linear-sampling/
 //key terms, pascal triangle, 
-uniform int STD_DEV = 3;
-float PI = 3.1416;
+uniform int STD_DEV <  
+ui_min = 1; 
+ui_max = 16; 
+> 
+= 16;
+
+uniform float PI = 3.1416;
 //2 dimensional gaussion equation
 float Gaussian(float x, float y, float std_dev)
 {
@@ -165,5 +170,72 @@ technique GaussianBlurTechnique
     {
         VertexShader = PostProcessVS;
         PixelShader = GuassionBlur;
+    }
+}
+
+
+//----------------------Sobel_Filter--------------------------------------------------//
+
+//sobel kernel in the x direction
+uniform float x_gradient[9] = {
+    1, 0, -1,
+    2, 0, -2,
+    1, 0, -1
+};
+
+uniform float y_gradient[9] = {
+    1, 2, 1,
+    0, 0, 0,
+    -1,-2,-1
+};
+
+float getElement(float arr[9], int row, int col, int size)
+{
+    return arr[row * size + col];
+}
+
+
+float4 SobelFilter(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
+{
+    float2 texel_size = 1.0 / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
+    float3 gradient_x = 0;
+    float3 gradient_y = 0;
+
+    // Apply Sobel filter in x direction
+    for (int i = -1; i <= 1; i++)
+    {
+        for (int j = -1; j <= 1; j++)
+        {
+            float2 offset = float2(i, j) * texel_size;
+            float weight = getElement(x_gradient, i + 1, j + 1, 3); // 3 is the size of each row
+            gradient_x += tex2D(ReShade::BackBuffer, texture_cord + offset).rgb * weight;
+        }
+    }
+
+    // Apply Sobel filter in y direction
+    for (int i = -1; i <= 1; i++)
+    {
+        for (int j = -1; j <= 1; j++)
+        {
+            float2 offset = float2(i, j) * texel_size;
+            float weight = getElement(y_gradient, i + 1, j + 1, 3); // 3 is the size of each row
+            gradient_y += tex2D(ReShade::BackBuffer, texture_cord + offset).rgb * weight;
+        }
+    }
+
+    // Combine gradients to get magnitude
+    float3 gradient_magnitude = sqrt(gradient_x * gradient_x + gradient_y * gradient_y);
+
+    // Optionally, output grayscale or edge map
+    return float4(gradient_magnitude, 1.0);
+}
+
+
+technique SobelFilterTechnique
+{
+    pass
+    {
+        VertexShader = PostProcessVS;
+        PixelShader = SobelFilter;
     }
 }
