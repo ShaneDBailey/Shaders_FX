@@ -239,3 +239,68 @@ technique SobelFilterTechnique
         PixelShader = SobelFilter;
     }
 }
+
+//-------------------------------------------Invert_Colors--------------------------------//
+float4 InvertColors(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
+{
+    float4 original_color = tex2D(ReShade::BackBuffer, texture_cord);
+    float4 inverted_color = 1.0 - original_color; 
+
+    return inverted_color;
+}
+
+    technique InvertTechnique
+{
+    pass
+    {
+        VertexShader = PostProcessVS;
+        PixelShader = InvertColors;
+    }
+}
+//------------------------------------------Contrast_Enhancement----------------------------//
+float4 ContrastAdjustment(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
+{
+    float4 original_color = tex2D(ReShade::BackBuffer, texture_cord);
+    float contrast = 2.0; 
+    float4 adjusted_color = (original_color - 0.5) * contrast + 0.5;
+
+    return adjusted_color;
+}
+
+    technique ContrastTechnique
+{
+    pass
+    {
+        VertexShader = PostProcessVS;
+        PixelShader = ContrastAdjustment;
+    }
+}
+
+
+//-------------------------------------------Double_Vision-----------------------------------//
+
+uniform float double_vision_offset = 10.0;
+float4 DoubleVision(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
+{
+    float2 texel_size = 1.0 / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
+    float4 color1 = tex2D(ReShade::BackBuffer, texture_cord - double_vision_offset * texel_size); // Adjust offset as needed
+    float4 color2 = tex2D(ReShade::BackBuffer, texture_cord + double_vision_offset * texel_size); // Adjust offset as needed
+
+    // Interpolate between the two samples to create the double vision effect
+    float4 double_vision_color = lerp(color1, color2, 0.5); // Adjust blend ratio if needed
+
+    return double_vision_color;
+}
+
+    technique DoubleVisionTechnique
+{
+    pass
+    {
+        VertexShader = PostProcessVS;
+        PixelShader = DoubleVision;
+    }
+}
+//double vision
+//solarize above
+//solarize below
+//cell shade
