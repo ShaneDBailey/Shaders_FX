@@ -125,7 +125,7 @@ uniform int STD_DEV <
 ui_min = 1; 
 ui_max = 16; 
 > 
-= 16;
+= 1;
 
 uniform float PI = 3.1416;
 //2 dimensional gaussion equation
@@ -300,7 +300,83 @@ float4 DoubleVision(float4 colorInput : SV_Position, float2 texture_cord : TexCo
         PixelShader = DoubleVision;
     }
 }
-//double vision
-//solarize above
-//solarize below
-//cell shade
+
+//-------------------------------------Depth_Display--------------------------------------------//
+
+float4 DepthDisplayShader(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
+{
+    float depth_value = ReShade::GetLinearizedDepth(texture_cord).x;
+    float4 depth_color = float4(depth_value, depth_value, depth_value, 1.0);
+
+    return depth_color;
+}
+
+technique DepthDisplayTechnique
+{
+    pass
+    {
+        VertexShader = PostProcessVS;
+        PixelShader = DepthDisplayShader;
+    }
+}
+
+//-----------------------------------Background_Blur------------------------------------------//
+
+float4 DepthBlur(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
+{
+        float2 texel_size = 1.0 / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
+    float depth_to_blur = 0.5;
+    float depth_value = ReShade::GetLinearizedDepth(texture_cord).x;
+    float4 final_color = lerp(GaussianBlur(texture_cord, texel_size, STD_DEV), tex2D(ReShade::BackBuffer, texture_cord), depth_value < 0.5);
+    return final_color;
+}
+
+technique DepthBlurTechnique
+{
+    pass
+    {
+        VertexShader = PostProcessVS;
+        PixelShader = DepthBlur;
+    }
+}
+//---------------------------------------Inverse_Hull-------------------------------//
+
+
+float4 InverseHullTechnique(float4 colorInput : SV_Position, float2 texture_cord : TexCoord) : SV_Target
+    {
+        // Sample the color from the color buffer
+     float4 baseColor = tex2D(ReShade::BackBuffer, texture_cord);
+    float2 texel_size = 1.0 / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
+
+    // Calculate the difference in depth between adjacent pixels (edge detection)
+    float depthThreshold = 0.001; // Adjust based on scene depth range and desired effect
+    float depthCenter = ReShade::GetLinearizedDepth(texture_cord).x;
+
+    float depthLeft = ReShade::GetLinearizedDepth(texture_cord + float2(-1, 0) * texel_size).x;
+    float depthRight = ReShade::GetLinearizedDepth(texture_cord + float2(1, 0) * texel_size).x;
+    float depthUp = ReShade::GetLinearizedDepth(texture_cord + float2(0, -1) * texel_size).x;
+    float depthDown = ReShade::GetLinearizedDepth(texture_cord + float2(0, 1) * texel_size).x;
+
+    // Compute edge detection
+    float edgeFactor = saturate(abs(depthCenter - depthLeft) + abs(depthCenter - depthRight)
+                               + abs(depthCenter - depthUp) + abs(depthCenter - depthDown));
+
+    // Apply inverse hull effect
+    float outlineThickness = 200.0; // Adjust based on desired thickness of the outline
+    float4 outlineColor = float4(0.0, 0.0, 0.0, 1.0); // Black color for outline
+
+    float4 finalColor = lerp(baseColor, outlineColor, saturate(edgeFactor - depthThreshold) * outlineThickness);
+
+    return finalColor;
+    }
+
+        technique InverseHullTechnique
+    {
+        pass
+        {
+            VertexShader = PostProcessVS; // Assuming PostProcessVS is your vertex shader
+            PixelShader = InverseHullTechnique;
+        }
+    }
+
+//---------------------------Normal_Shader--------------------------------------------//
